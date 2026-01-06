@@ -1,0 +1,321 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{verbatim}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage[a4paper, margin=25]{geometry}
+
+\usepackage{amsmath}
+\title{Introdcuttion to Computer Language Bash Assigment 1}
+\author{Darix, SAMANI SIEWE}
+\date{\today}
+
+
+\begin{document}
+
+\maketitle
+
+\begin{enumerate}
+    \item Write a bash function that asks for n and computes:
+        \begin{enumerate}[label=(\roman*)]
+            \item $\displaystyle\sum_{\substack{i=1 \\ i is odd}}^{n} (i+3)$
+
+            \item $\displaystyle\sum_{\substack{i=1 \\ i is even}}^{n} (i+3)$
+            
+        \end{enumerate}
+
+        The function should have one argument to check if you want to compute for odd or even
+increments (i).
+
+        \textbf{Solution: }
+        \begin{verbatim}
+function question_1 () {
+	read -p "enter n: "  n
+	s=0
+	i=1
+	if [ $1 == "odd" ]; then
+
+		while [ $i -le $n ]
+		do
+			if [ $(($i%2)) -ne 0 ]; then
+				s=$((s + i + 3))
+			fi
+			i=$((i+1))
+		done
+
+		echo "The sum S from 1 to $n is: $s "
+
+	
+	elif [ $1 == "even" ]; then
+
+		while [ $i -le $n ]
+		do
+			if [ $(($i%2)) -eq 0 ]; then
+				s=$((s + i + 3))
+			fi
+			i=$((i+1))
+
+		done
+
+		echo "The sum S from 1 to $n is $s" 
+
+	
+	else
+		echo "you provided a wrong input"
+	fi
+}
+            \end{verbatim}
+
+    \item Write a program that reads a number of the day of the week (from 0 to 6). If it is a
+working day, then the program will write the name of the corresponding day. Otherwise,
+it will write the word ”Weekend”.
+
+    \textbf{Solution:}
+
+    \begin{verbatim}
+function question_2 () {
+	read -p "Enter the number of the day to want from 0 to 6: " d
+
+	if [ $d -eq 0 ]; then
+		echo "Monday"
+	elif [ $d -eq 1 ]; then
+		echo "Tuesday"
+	elif [ $d -eq 2 ]; then
+		echo "Wenesday"
+	elif [ $d -eq 3 ]; then
+		echo "Thrusday"
+	elif [ $d -eq 4 ]; then
+		echo "Friday"
+	elif [ $d -ge 5 ] && [ $d -le 6 ]; then
+		echo "Weekend"
+	else
+		echo "You provided a wrong input"
+	fi
+}
+    \end{verbatim}
+
+    \item Make a program that, given a month number (from 0 to 11), indicates how many days it
+has (28, 30 or 31), ignoring the leap years.
+
+    \textbf{Solution:}
+
+    \begin{verbatim}
+function question_3 () {
+	read -p "Enter the number of month from 0 to 11: " m
+
+	if [ $m -eq 0 ] || [ $m -eq 2 ] || [ $m -eq 4 ] || [ $m -eq 6 ] || [ $m -eq 7 ] || [ $m -eq 9 ] || [ $m -eq 11 ]; then
+		echo "The number of days in $m is : 31"
+	elif [ $m -eq 3 ] || [ $m -eq 5 ] || [ $m -eq 8 ] || [ $m -eq 10 ]; then
+		echo "The number of days in $m month is 30"
+	elif [ $m -eq 1 ]; then 
+		echo "The number of days in $m month is 28 or 29"
+	else
+		echo "You provided the wrong input"
+	fi
+}
+    \end{verbatim}
+
+    \item Write two versions of bash code that displays your name 3 times. One version with a ”for
+loop” and another version with a ”while loop”.
+
+    \textbf{Solution}
+
+    \begin{verbatim}
+function question_4 () {
+	name="Darix SAMANI SIEWE"
+	echo "Diplay my name with for loop"
+	for i in {1..3};
+	do
+		echo "$i my name is $name"
+	done
+
+	echo "Display my name with while loop"
+	i=1
+
+	while [ $i -lt 4 ];
+	do
+		echo "$i ny name is $name"
+		i=$((i+1))
+	done
+}
+    \end{verbatim}
+
+    \item Given two numbers $x_0$ and $x_1$ , the Fibonacci sequence they generate is constructed from the recursion formula $x_{n+1} = x_n + x_{n-1}$ . Calculate the first 15 terms of a Fibonacci sequence, asking the user the initial values.
+
+    \begin{verbatim}
+function question_5 () {
+	read -p "Enter the first value of fibonnaci X0: " a
+	read -p "Enter the second vaue of fibonnaci x1: " b
+	fib=0
+	x=0
+	for i in  {1..15};
+	do
+		fib=$((a+b))
+		echo "the $i terms of fibonnaci is : $fib"
+		a=$b
+		b=$fib
+	done
+}
+    \end{verbatim}
+
+    \item Compute the first 30 terms of the sequence demode by $x_{n+2} = x_{n+1} - 3x_n$ sequence, given 2 any two initial values $x_0$ and $x_1$
+
+    \begin{verbatim}
+function question_6 () {
+	read -p "Enter the initiale value of X0: " a
+	read -p "Enter the initiale value of X1: " b
+	
+	for i in {1..30};
+	do
+		s=$(echo "scale=4; 0.5*$b-3*$a" | bc)
+		echo "The $i term is: $s"
+		a=$b
+		b=$s
+	done
+}
+    \end{verbatim}
+
+    \item \begin{enumerate}
+        \item Write bash code that computes the sum of the square of the first n natural numbers.
+One version with a ”for loop” and another version with a ”while loop”.
+        
+        \textbf{Solution:}
+
+        \begin{verbatim}
+function question_7_a () {
+	read -p "Enter the value of n: " n
+	echo "using for loop"
+	s=0
+	for i in $(seq 1 $n);
+	do
+		s=$((s+i**2))
+	done
+	echo "the somme of the square of the first $n naturels numbers is: $s"
+	s=0
+	echo " using while loop"
+	i=0
+	while [ $i -le $n ]
+	do
+		s=$((s+i**2))
+		i=$((i+1))
+	done
+	echo "The somme of the square of the first $n naturels numbers is: $s"
+
+}
+        \end{verbatim}
+
+        \item Write bash code that prints, for a natural number M , the smallest natural number
+n such that $1_2 + 2_2 + \ldots + n_2 \geq M$ . One version with a ”for loop” and another
+version with a ”while loop”.
+
+        \textbf{Solution:}
+
+        \begin{verbatim}
+function question_7_b () {
+	read -p "Enter the value of M: " M
+
+	echo "Version with for loop"
+	n=0
+	s=0
+	for (( i=0 ; ; i++ ));
+	do
+		s=$((s+i**2))
+		if [ $s -ge $M ]; then
+			n=$i
+			break
+		fi
+	done
+
+	echo "The value of n using for loop is : $n"
+
+
+	echo "Version with while loop"
+	s=0
+	i=0
+	n=0
+	while true
+	do
+		s=$((s+i**2))
+		if [ $s -ge $M ]; then
+			n=$i
+			break
+		fi
+		i=$((i+1))
+	done
+	
+	echo "The value of n using while loop is: $n"
+
+}
+        \end{verbatim}
+    \end{enumerate}
+
+    \item Read an integer number n, between 0 and 9, and print its multiplication table up to N
+where N is another natural number the program reads.
+
+    \textbf{Solution: }
+
+    \begin{verbatim}
+function question_8 () {
+	read -p "Enter de number between 0 and 9: " n
+	read -p "Enter de number between 0 and 9: " N
+	for i in $(seq 1 $N)
+	do
+		echo " $n X $i = $((n*i))"
+	done
+}
+    \end{verbatim}
+
+    \item Write a program that prints all the numbers between 0 and 40 that are multiples of 3, 7
+or 11.
+
+    \textbf{Solution:}
+    
+    \begin{verbatim}
+function question_9 () {
+	echo "print all numbers from 0 to 40 that are multiples of 3, 7 or 11:"
+	for i in {3..40}
+	do
+		if [ $(($i%3)) -eq 0 ] || [ $(($i%7)) -eq 0 ] || [ $(($i%11)) -eq 0 ]; then
+			echo $i
+		fi
+	done
+}
+    \end{verbatim}
+
+    \item Ask for an integer number between 0 and 9, denoted x. Once the user has entered a
+correct number (that is one in the range [0, 10)) the program asks for a second integer
+number between 0 and 255, denoted max. The program continues asking for the number
+until it is correct (that it is in the range [0, 256)). When this is done, show all multiples
+of x that are between 0 and max. Then, ask the user whether he/she wants to continue;
+if in the affirmative, ask for another couple of numbers; otherwise, finish.
+
+    \textbf{Solution: }
+
+    \begin{verbatim}
+function question_10 () {
+	read -p "Enter a integer between 0 and 9: " x
+	while [ $x -lt 0 ] || [ $x -gt 9 ]
+	do
+		read -p "Please you need to enter a number between 0 and 9 incluse: " x
+	done
+	
+	read -p "Enter a integer between 0 and 255: " max
+	while [ $max -lt 0 ] || [ $max -gt 255 ]
+	do
+		read -p "Please you need to enter a number between 0 and 255 incluse: " max
+	done
+
+	echo "All mutilples of $x betwwen 0 and $max is: "
+	for i in $(seq 1 $max)
+	do
+		if [ $(($i%x)) -eq 0 ]; then
+			echo $i
+		fi
+	done
+
+}
+    \end{verbatim}
+        
+\end{enumerate}
+
+\end{document}
