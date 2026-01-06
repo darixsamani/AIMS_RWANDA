@@ -1,0 +1,78 @@
+---
+title: "African Institute for Mathematical Sciences, Rwanda"
+subtitle: "Bash/R Programming Tutorials"
+output: pdf_document
+date: '`r Sys.Date()`'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Requirements
+
+-   Group work to solve the following questions
+
+-   Each group will present
+
+## Questions
+
+a.  Import the `data.xlsx` data in R. Install the `openxlsx` package if you do not have it installed.
+
+```{r warning=FALSE, message=FALSE}
+library(openxlsx) # use function read.xlsx
+# tuto_data <- complete the code
+tuto_data <- read.xlsx("./data.xlsx")
+tuto_data
+```
+
+b.  Calculate the percentage of missing values in each column
+
+```{r}
+is.na(tuto_data)
+summary(tuto_data)
+37/length(tuto_data$X1)*100
+25/length(tuto_data$X2)*100
+18/length(tuto_data$X3)*100
+45/length(tuto_data$X4)*100
+```
+
+c.  How many observations will we get if we were to remove each row containing missing values?
+
+```{r}
+boxplot(tuto_data$X1)
+boxplot(tuto_data$X2)
+boxplot(tuto_data$X3)
+boxplot(tuto_data$X4)
+
+
+```
+
+d.  Replace NAs in each column
+
+    -   by its average if the column is numeric
+    -   by its mode if the column is categorical
+
+e.  Draw the box plots of numeric column
+
+```{r}
+
+```
+
+f.  Make a scatter plot of `X3` and `X4` colored by `Class`. What do you observe?
+
+```{r}
+plot(X3~X4, data = tuto_data)
+```
+
+g.  What is the percentage of each class in the NA-free (imputed) data
+
+```{r}
+
+```
+
+h.  What is the average of `X2` in each `Class`?
+```{r}
+mean(tuto_data$X2, na.rm = TRUE)
+```
+
