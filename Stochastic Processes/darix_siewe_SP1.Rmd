@@ -1,0 +1,72 @@
+---
+title: "Assignment Stochastic Process"
+author: "Darix SAMANI"
+date: '2025-01-31'
+output: pdf_document
+---
+
+
+
+
+
+## Simulation of Simulate the first 20 letters (vowel/consonant) of the Pushkin poem Markov chain
+
+
+
+```{r pressure, echo=FALSE}
+
+run.mc.sim <- function(P, num.iters = 100) {
+  
+  
+  num.states <- nrow(P)
+  
+  
+  states <- numeric(num.iters)
+  
+  
+  states[1] <- sample(1:num.states, 1)  
+  
+  
+  for(t in 2:num.iters) {
+    
+    p <- P[states[t-1], ]
+    
+    states[t] <- which(rmultinom(1, 1, p) == 1)
+  }
+  
+  return(states)
+}
+
+##setup transition matrix
+P <- matrix(c(0.128, 0.872,   
+              0.663, 0.337), 
+            nrow = 2, byrow = TRUE)
+
+
+#P
+
+
+num.chains <- 1 
+num.iterations <- 20  
+
+# defined the matrix of to stor the state
+chain.states <- matrix(NA, ncol = num.chains, nrow = num.iterations)
+
+# Simulate the chain(s)
+for(c in seq_len(num.chains)) {
+  chain.states[,c] <- run.mc.sim(P, num.iters = num.iterations)
+}
+
+# Print the simulated sequence of vowels (1) and consonants (2)
+#print(chain.states)
+
+
+matplot(chain.states, cex = 12, pch = 19, type = 'l', lty = 1, col = 1:5, ylim = c(0, 3), 
+        ylab = 'State (1=Vowel, 2=Consonant)', xlab = 'Time')
+abline(h = 1, lty = 3)  
+abline(h = 2, lty = 3)
+
+```
+
+
+
