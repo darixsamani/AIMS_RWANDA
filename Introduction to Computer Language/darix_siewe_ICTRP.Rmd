@@ -1,0 +1,228 @@
+---
+title: "Final Project on Introduction to Computer Language"
+author: "Darix SAMANI SIEWE"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+In this project, you will import the `data.txt`, perform some data processing, visualization and modelling.
+
+### Required packages
+```{r message=FALSE, warning=FALSE}
+# list all packages here
+install.packages("caret", dependencies = TRUE)
+install.packages("ggplot2", dependencies = TRUE)
+install.packages("moments", dependencies = TRUE)
+install.packages("rpart", dependencies = TRUE)
+install.packages("rpart.plot", dependencies = TRUE)
+
+library(moments)
+library(ggplot2)
+library(rpart.plot)
+library(caret)
+library(rpart)
+library(rpart.plot)
+# library(caret)
+```
+
+
+### Inport data
+
+```{r}
+data <- read.csv("./data.txt")
+head(data)
+```
+
+Q1. What do you see when you look at the column name of data?
+```{r}
+colnames(data)
+```
+
+
+**Answer: **  The first row is consider as a cologne of our dataset(dataframe).
+
+Q2. How can we solve the problem in Q1.? *Hint: explore the arguments of the `read.csv()` function*.
+```{r}
+data <- read.csv("./data.txt", header=FALSE, sep=",")
+head(data)
+```
+
+
+Q3. How many rows and columns does `data` have?
+```{r}
+cat("Nombers of rows:", nrow(data), "\n")
+cat("numbers of colums:", length(colnames(data)))
+```
+
+
+Q4. Change the column names of `data` in this order: `age, workclass, fnlwgt, education, education_num, marital_status, occupation, relationship, race, sex, capital_gain, capital_loss, hours_per_week, native_country, class`.
+
+Check the data names [here](https://archive.ics.uci.edu/dataset/2/adult)
+
+```{r}
+colnames(data) <- c("age", "workclass", "fnlwgt", "education", "education_num", "marital_status", "occupation", "relationship", "race", "sex", "captal_gain", "capital_loss", "hours_per_week", "native_country", "class")
+head(data)
+```
+
+
+Q5. Replace all "?" in the data with `NA` (Not available)
+```{r}
+ data[data==" ?"]<- NA
+tail(data)
+```
+
+
+Q6. Plot the histogram of ages using ggplot2
+```{r}
+ggplot(data, aes(x=age)) + geom_histogram(binwidth=1, color="black", fill="lightblue", linetype="dashed")
+```
+
+Calculate the skewness of the variable `age` and comment about its distribution.
+```{r}
+## R doen't have a native founction to compute the skewness of varibale, we need to load the package, moment
+skewness(data$age)
+
+```
+**comments** that a distribution is right skewed. A right skewed distribution would be biased towards higher values, such that the mean of the distribution will exceed the median of the distribution.
+
+
+
+Q7. How many observation do we have for the `Private` category of the `workclass` variable?
+
+```{r}
+length(which(data$workclass==" Private"))
+```
+
+
+Q8. How many `marital_status` are `Married-civ-spouse` for the `Private` workclass ? 
+```{r}
+length(which(data$marital_status == " Married-civ-spouse" & data$workclass == " Private"))
+
+```
+
+
+
+Q9. How many `marital_status` are `Married-civ-spouse` for the `Private` workclass and for each race?
+```{r}
+x <- subset(data, marital_status == " Married-civ-spouse" & workclass == " Private")
+tapply(x$marital_status, x[[9]], length)
+
+```
+
+
+Q10. How many `marital_status` are `Married-civ-spouse` for the `Private` workclass and for each sex?
+```{r}
+x <- subset(data, marital_status == " Married-civ-spouse" & workclass == " Private")
+tapply(x$marital_status, x[[10]], length)
+```
+
+
+Q11. Recode the variable `class` to 0 if class is `<=50` and 1 else.
+```{r}
+
+data$class[data$class==" <=50K"] <- 0
+data$class[data$class==" >50K"] <- 1
+
+
+```
+
+
+Q12. Replace NA with the mean if the variable is continuous and the mode if the variable is categorical.
+```{r}
+replace_na <- function (df){
+  for (colname in colnames(df)){
+    if (is.numeric((df[, colname]))){
+      df[is.na(df[, colname]), colname] <- mean(data[, colname], na.rm = TRUE)
+    }
+    else {
+     df[is.na(df[, colname]), colname] <- mode(data[, colname]) 
+  }
+  }
+  df
+}
+data <- replace_na(data)
+tail(data)
+```
+
+
+Q.13 Split the data in train (80%) and test (20%) using the `caret` package. Set the seed to 20092024.
+```{r}
+set.seed(20092024)
+library(caret)
+trainIndex <- createDataPartition(data$class, p=0.8, list = FALSE)
+
+trainData <- data[trainIndex,]
+
+
+testData <- data[-trainIndex,]
+
+
+```
+
+
+Q.14 Fit a decision tree with train set. What is the confusion matrix?
+```{r}
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+dtree_fit <- train(class ~., data = trainData, method = "rpart",
+                   parms = list(split = "information"),
+                   trControl=trctrl,
+                   tuneLength = 10)
+
+test_pred <- predict(dtree_fit, newdata = testData[, 1:14])
+confusionMatrix(test_pred, as.factor(testData$class))
+```
+
+a. Draw the decision three.
+```{r}
+rpart.plot(dtree_fit$finalModel, type = 3, extra = "auto", main = "Decision Tree for our Dataset")
+```
+
+b. What is the accuracy of the model on the test set?
+```{r}
+cm <- confusionMatrix(test_pred, as.factor(testData$class))
+
+overall.accuracy <- cm$overall['Accuracy']
+cat("accuracy on testing data : ", overall.accuracy, "\n")
+```
+
+
+Q.15 Fit a generalized linear model with train set. What is the confusion matrix?
+```{r,warning=FALSE}
+trainData$class <- as.numeric(trainData$class)
+glm_model <- glm(class ~ ., data=trainData, family = "binomial")
+predit_data_glm <- predict(glm_model, newdata=testData[, 1:14])
+
+confusionMatrix(factor(predit_data_glm>0.5, levels = c(T,F), labels = c("1", "0")), as.factor(testData$class))
+
+```
+
+a. Print the summary of the model. 
+```{r,warning=FALSE}
+summary(glm_model)
+```
+
+b. Which variable(s) is/are not statistically significant? Explain why?
+
+all variables that the p-value is greater than 0.05 is npt statistically significant 
+
+```{r,warning=FALSE}
+summary(glm_model)$coeff[-1,4] > 0.05
+```
+
+
+c. What is the accuracy of the model on the test set?
+
+```{r, warning=FALSE}
+cm <- confusionMatrix(factor(predit_data_glm>0.5, levels = c(T,F), labels = c("1", "0")), as.factor(testData$class))
+overall.accuracy <- cm$overall['Accuracy']
+cat("accuracy on testing data : ", overall.accuracy, "\n")
+
+```
+
