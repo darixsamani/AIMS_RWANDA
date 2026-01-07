@@ -1,0 +1,834 @@
+---
+title: 'Statistical Machine Leaning: Assigement 2'
+author: "Darix SAMANI SIEWE"
+date: "14/12/2024"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Exercise 1: Practical SML on DNA Microarrays (60 points)
+
+```{r, echo=FALSE, include = FALSE}
+library(class)
+library(rpart)
+library(rpart.plot)
+library(ROCR)
+library(ggplot2)
+library(RColorBrewer)
+require(reshape2)
+```
+
+
+#### Load the dataset
+
+```{r, echo=FALSE, include = FALSE}
+prostate <- read.csv("prostate-cancer-1.csv") # DNA MicroArray Gene Expression
+```
+
+1. Comment on the shape of this dataset in terms of the sample size and the dimensionality
+of the input space
+
+```{r, warning=FALSE, echo=FALSE}
+   n   <- nrow(prostate)       # Sample size
+   p   <- ncol(prostate) - 1   # Dimensionality of the input space
+   
+   n; p
+   
+  # Kapper calculation
+  kapper <- n / p
+  
+  cat("Kapper (size divided by input space) is:", kapper, "\n")
+```
+
+In this case, the number of features is greater than the number of samples. The Kapper of this dataset is less than 1, which means we are dealing with the case of ultra-high dimensionality. Since the number of features is very large, we need to reduce the dimensionality of the input space by selecting the relevant features that capture more of the response variable, using methods like PCA or LASSO.
+
+2. Comment succinctly from the statistical perspective on the type of data in the input space
+
+```{r, echo=FALSE, include = FALSE}
+ # summary(prostate[, 2: 500])
+```
+    
+  - The values range from negative to positive, indicating a normalization or transformation step, such as standardization or log transformation.
+  - Min/Max: The minimum and maximum values of most variables range from roughly -0.4 to +0.5, suggesting relatively small deviations from the mean.
+  - most of the variable has the 1 quantile near to zero which means there the symmetric distribution in the central tendency.
+  - Looking at the distribution of almost the variable we can see that variable seems to follow normal distribution or log-normal distribution
+  - All the type of the input variable are continuous
+ 
+ 2. Plot the distribution of the response for this dataset and comment.
+ 
+```{r, echo=FALSE}
+# Create a density plot for all probes
+barplot(table(prostate$Y), col=2:3, xlab='spam')
+```
+ Based on the distribution above, we can see that our dataset is balanced, meaning we don't need methods like stratified holdout.
+ 
+ 3. Identify the 9 individually most powerful predictor variables with respect to the response
+according the Kruskal-Wallis test statistic
+ 
+```{r, echo=FALSE,}
+
+predictor = prostate[2:500]
+response = prostate$Y
+# Run Kruskal-Wallis test for each predictor
+kruskal_results <- apply(predictor, 2, function(x) {
+  kruskal.test(x ~ response)$p.value
+})
+
+# build dataframe of the result
+kruskal_results_df <- data.frame(
+  predictor = colnames(predictor),
+  p_value = kruskal_results
+)
+
+# Sort the Kruskal-Wallis results by p-value in ascending order
+sorted_results <- kruskal_results_df[order(kruskal_results_df$p_value), ]
+
+
+# Retreive the most significant varibale in the input space
+top_9_predictors <- head(sorted_results, 9)
+
+print(top_9_predictors)
+```
+ 
+4. Generate a type=’h’ plot with the Kruskal-Wallis test statistic as the y-axis and the
+variable name as the x-axis
+
+```{r, echo=FALSE}
+# Calculate Kruskal-Wallis test statistics (chi-squared values)
+kruskal_test_stats <- sapply(predictor, function(x) kruskal.test(x ~ response)$statistic)
+
+# Create a data frame with the test statistics and variable names
+kruskal_results_df <- data.frame(
+  predictor = colnames(predictor),
+  test_statistic = kruskal_test_stats
+)
+
+# Plot using base R's plot function
+plot(
+  1:length(kruskal_results_df$predictor), 
+  kruskal_results_df$test_statistic, 
+  type = 'h', 
+  lwd = 2,  
+  col = "blue",  
+  axes = FALSE,  
+  xlab = "",  
+  ylab = "Test Statistic", 
+  main = "Kruskal-Wallis Test Statistics for Predictors"
+)
+
+axis(1, at = 1:length(kruskal_results_df$predictor), labels = kruskal_results_df$predictor, las = 2)
+
+par(mar = c(5, 10, 4, 2))
+```
+5. Generate the comparative boxplots of the 9 most powerful variable with respect to the
+response and comment on what you observe.
+
+```{r, echo=FALSE}
+## vector retore most powerful varible 
+most_9_varible = c("X217844_at", "X211935_at", "X212640_at", "X201290_at", "X215333_x_at", "X201480_s_at", "X209454_s_at", "X200047_s_at", "X214001_x_at")
+par(mfrow=c(3,3))
+for(var in most_9_varible)
+  {
+    boxplot(prostate[,var]~response, col=2:3, ylab=var, xlab='Y')
+  }
+```
+
+The plot above show us that our variable "X201290_at" in the input space split mostly data, which means this variable is the variable that certainly can be in the root of the tree.
+
+7. Build the classification tree with cp=0.01
+
+```{r, warning=FALSE, echo=FALSE}
+library(rattle)
+tree.prostate <- rpart(Y ~ .,
+                  data = prostate,
+                  method = "class",  
+                  control = rpart.control(cp = 0.01))
+ ## we use this package for beautiful visualization
+ fancyRpartPlot(tree.prostate, sub = "Tree with cp 0.01")
+```
+  
+  - Determine the number of terminal nodes
+    
+    Based on the plot above the number of terminal nodes is 4
+    
+  - Write down in mathematical form region 2 and Region 4.
+    
+    - The expression of Region 2 is : 
+      $$
+        R_2 = \{x \quad in \quad  \mathcal{X} \quad X2021290\_at \geq 1.097  \quad and \quad  X214008 \geq -0.2916 \}
+      $$
+    
+    - the expression of region 4 is:
+    
+      $$
+        R_4 = \{x \quad in \quad  \mathcal{X} \quad X2021290\_at < 1.097  \quad and \quad  X209048\_s\_at < 0.06313 \}
+      $$
+    
+  - Comment on the variable at the root of the tree in light of the Kruskal-Wallis statistic
+    
+    we see that the variable in the root meet our expectation because the test statistic Kruskal-Wallis revel that the variable in the root well split our dataset into two classes.
+    
+8. Generate the comparative boxplots of the 9 weakest variable with respect to the response
+and comment on what you observe.
+
+```{r, echo=FALSE}
+## let's find the 9 weakest variabale using the test Kruskal-Wallis statistic
+weakest_9 <- c("X215346_at", "X204058_at", "X208140_s_at", "X201975_at", "X208838_at", "X204905_s_at", "X200793_s_at", "X202089_s_at", "X221580_s_at")
+#tail(sorted_results, 9)
+par(mfrow=c(3,3))
+for(var in weakest_9)
+{
+    boxplot(prostate[, var]~response, col=2:3, ylab=var, xlab='Y')
+}
+```
+
+
+
+9. Generate the correlation plot of the predictor variables and comment extensively on what
+they reveal, if anything.
+
+```{r, warning=FALSE, echo=FALSE}
+library(corrplot)
+cor_matrix <- cor(predictor[most_9_varible])
+corrplot(cor_matrix, method = "color", type = "upper", tl.cex = 0.7)
+```
+
+The Matrix Correlation plot above show us that must of the variable are strongly correlated.
+
+10. Compute the eigendecomposition of the correlation matrix and comment on the ratio $\lambda_{max}/\lambda_{min}$.
+
+```{r, echo=FALSE}
+
+cor_matrix <- cor(predictor)
+
+
+eigen_decomp <- eigen(cor_matrix)
+
+eigenvalues <- eigen_decomp$values  
+
+
+lambda_min <- min(eigenvalues)
+lambda_max <- max(eigenvalues)
+
+ratio <- lambda_max/lambda_min
+
+ cat("The Ration Lambda_max/Lambda_min is :", ratio, "\n")
+```
+
+Since the ratio $\frac{\lambda_{max}}{\lambda_{min}}$ is very small, it means our correlation matrix is well-conditioned, so it is numerically stable. 
+
+11. Using the whole data for training and the whole data for test, build the above six learning
+machines, then plot the comparative ROC curves on the same grid
+
+```{r, echo=FALSE}
+  y.roc   <- as.factor(response)
+  kNN_1.mod <- class::knn(predictor, predictor, y.roc, k=1, prob=TRUE)
+  prob_1    <- attr(kNN_1.mod, 'prob')
+  prob_1    <- 2*ifelse(kNN_1.mod == "0", 1-prob_1, prob_1) - 1
+  
+  pred.knn_1 <- prediction(prob_1, y.roc)
+  pred.knn_1 <- performance(pred.knn_1, measure='tpr', x.measure='fpr')
+  
+  kNN_7.mod <- class::knn(predictor, predictor, y.roc, k=7, prob=TRUE)
+  prob_7    <- attr(kNN_7.mod, 'prob')
+  prob_7    <- 2*ifelse(kNN_7.mod == "0", 1-prob_7, prob_7) - 1
+  
+  pred.knn_7 <- prediction(prob_7, y.roc)
+  pred.knn_7 <- performance(pred.knn_7, measure='tpr', x.measure='fpr')
+  
+  kNN_9.mod <- class::knn(predictor, predictor, y.roc, k=9, prob=TRUE)
+  prob_9    <- attr(kNN_9.mod, 'prob')
+  prob_9    <- 2*ifelse(kNN_9.mod == "0", 1-prob_9, prob_9) - 1
+  
+  pred.knn_9 <- prediction(prob_9, y.roc)
+  pred.knn_9 <- performance(pred.knn_9, measure='tpr', x.measure='fpr')
+  
+  tree.prostate_cp_0 <- rpart(Y ~ ., data = prostate, method = "class", control = rpart.control(cp = 0))
+  prob_tree_c_0 <- predict(tree.prostate_cp_0, prostate, type = "prob")[,2]
+  prob_tree_c_0 <- prediction(prob_tree_c_0, prostate$Y)
+  pred.tree.prostate_cp_0 <- performance(prob_tree_c_0, measure='tpr', x.measure='fpr')
+  
+  
+  tree.prostate_cp_005 <- rpart(Y ~ ., data = prostate, method = "class", control = rpart.control(cp = 0.05))
+  prob_tree_c_005 <- predict(tree.prostate_cp_005, prostate, type = "prob")[,2]
+  prob_tree_c_005 <- prediction(prob_tree_c_005, prostate$Y)
+  pred.tree.prostate_cp_005 <- performance(prob_tree_c_005, measure='tpr', x.measure='fpr')
+  
+  tree.prostate_cp_01 <- rpart(Y ~ ., data = prostate, method = "class", control = rpart.control(cp = 0.1))
+  prob_tree_c_01 <- predict(tree.prostate_cp_01, prostate, type = "prob")[,2]
+  prob_tree_c_01 <- prediction(prob_tree_c_01, prostate$Y)
+  pred.tree.prostate_cp_01 <- performance(prob_tree_c_01, measure='tpr', x.measure='fpr')
+  
+  
+  
+  plot(pred.knn_1, col=2, lwd= 2, lty=2, main="ROC Comparaison between six machines")
+  plot(pred.knn_7, col=3, lwd= 2, lty=3, add = TRUE)
+  plot(pred.knn_9, col=4, lwd= 2, lty=4, add = TRUE)
+  plot(pred.tree.prostate_cp_0, col=5, lwd= 2, lty=5, add = TRUE)
+  plot(pred.tree.prostate_cp_005, col=6, lwd= 2, lty=6, add = TRUE)
+  plot(pred.tree.prostate_cp_01, col=7, lwd= 2, lty=4, add = TRUE)
+  abline(a=0,b=1) ## Random Classifiers
+  legend("bottomright", inset = 0.05, legend = c("KNN1", "KNN7", "KNN9", "tree with cp=0", "tree with cp=0.05", "tree with cp=0.1"), col = 2:7, lty = 2:4, lwd = 2)
+```
+12. Plot all the three classification tree grown, using the prp function for the package rpart.plot
+```{r, echo=FALSE}
+# for the first tree
+#fancyRpartPlot(tree.prostate_cp_0, sub = "Tree with cp =0")
+par(mfrow = c(1, 3))
+prp(tree.prostate_cp_0, main = "Tree with cp =0")
+prp(tree.prostate_cp_005, main = "Tree with cp =0.005")
+prp(tree.prostate_cp_01, main = "Tree with cp =0.01")
+```
+
+```{r, echo=FALSE, include = FALSE}
+# for the second tree
+#fancyRpartPlot(tree.prostate_cp_005, sub = "Tree with cp =0.005")
+
+```
+
+```{r, echo=FALSE, include = FALSE}
+# for the third tree
+#fancyRpartPlot(tree.prostate_cp_01, sub = "Tree with cp =0.1")
+```
+
+13. Comment succinctly on what the ROC curves reveal for this data and argue in light of
+theory whether or not that was to be expected.
+
+Based on the ROC plot, we can say that the machine KNN1 has an empirical risk equal to zero, which means it may be overfitting to the training data. Hence, this machine may not perform well on unknown data in a real-world scenario. Additionally, from the plot above, we can observe that the worst-performing machines are KNN7 and KNN9. We can also see that the best machine on the full dataset is one of the three decision tree models. However, it is not always guaranteed that the model that performs best on the full dataset will continue to be the best, because all the machines we trained above were learned from the full data. One of our recommendations is to use methods like cross-validation or stochastic holdout splits to validate our assumptions.
+
+
+
+14. Using set.seed(19671210) along with a 7/10 training 3/10 test basic stochastic holdout
+split of the data, compute S = 100 replicated random splits of the test error for all the
+above learning machines.
+
+```{r, warning=FALSE, echo=FALSE}
+set.seed(19671210)
+
+
+epsilon <- 3/10
+n <- nrow(prostate)
+nte <- round(n * epsilon)
+ntr <- n - nte
+S <- 100
+
+## matrix for test error for every s for each six machine
+test.err <- matrix(0, nrow = S, ncol = 6)
+
+for (s in 1:S){
+  id.tr <- sample(1:n, ntr)
+  id.te <- setdiff(1:n, id.tr)
+
+  data.tr <- prostate[id.tr, ]
+  data.te <- prostate[id.te, ]
+  y.te <- data.te$Y
+  y.roc <-  as.factor(prostate$Y)
+  
+  #Machine 1(knn1)
+  y.te.hat       <- knn(prostate[id.tr,], prostate[id.te,], y.roc[id.tr], k=1, prob=TRUE)
+  ind.err.te     <- ifelse(y.te!=y.te.hat,1,0)  # Random variable tracking error. Indicator
+  test.err[s,1]  <- mean(ind.err.te)
+  
+  #Machine 2(knn7)
+  y.te.hat       <- knn(prostate[id.tr,], prostate[id.te,], y.roc[id.tr], k=7, prob=TRUE)
+  ind.err.te     <- ifelse(y.te!=y.te.hat,1,0)  # Random variable tracking error. Indicator
+  test.err[s,2]  <- mean(ind.err.te)
+  
+  #Machine 3(knn9)
+  y.te.hat       <- knn(prostate[id.tr,], prostate[id.te,], y.roc[id.tr], k=9, prob=TRUE)
+  ind.err.te     <- ifelse(y.te!=y.te.hat,1,0)  # Random variable tracking error. Indicator
+  test.err[s,3]  <- mean(ind.err.te)
+  
+  #Machine four(Tree with cp=0)
+  tree_cp_0 <- rpart(Y ~ ., data = prostate[id.tr, ], method = "class", control = rpart.control(cp = 0))
+  y.te.hat       <- predict(tree_cp_0, prostate[id.te, ], type="class")
+  ind.err.te     <- ifelse(y.te!=y.te.hat,1,0)  # Random variable tracking error. Indicator
+  test.err[s,4]  <- mean(ind.err.te)
+  
+  #Machine five(Tree with cp=0.005)
+  tree_cp_005 <- rpart(Y ~ ., data = prostate[id.tr, ], method = "class", control = rpart.control(cp = 0.005))
+  y.te.hat       <- predict(tree_cp_005, prostate[id.te, ], type="class")
+  ind.err.te     <- ifelse(y.te!=y.te.hat,1,0)  # Random variable tracking error. Indicator
+  test.err[s,5]  <- mean(ind.err.te)
+  
+  #Machine five(Tree with cp=0.1)
+  tree_cp_01 <- rpart(Y ~ ., data = prostate[id.tr, ], method = "class", control = rpart.control(cp = 0.1))
+  y.te.hat       <- predict(tree_cp_01, prostate[id.te, ], type="class")
+  ind.err.te     <- ifelse(y.te!=y.te.hat,1,0)  # Random variable tracking error. Indicator
+  test.err[s,6]  <- mean(ind.err.te)
+}
+
+test_split <- data.frame(test.err)
+  
+Method<-c("KNN1","KNN7", "KNN9", "Tree with cp 0", "Tree with cp 0.005", "Tree with cp 0.1")
+colnames(test_split) <- Method
+
+ggplot(data = melt(test_split, id.vars = NULL), xlim = c(0, 0.7),  aes(x=, y=value)) + geom_boxplot(aes(fill=variable)) +
+    labs(x='Learning Machine', y=expression(hat(R)[te](f))) +
+    scale_y_continuous(limits = c(0, 0.7)) +
+    theme(legend.position="bottom") 
+```
+ 
+ - Comment on the distribution of the test error in light of (implicit) model complexity.
+  
+  So, based on the plot above, we can see that when we use a method like stochastic holdout split of the data, with $S=100$ and a 7/10 training and 3/10 testing split, we are surprised by the results. Without using this method, the universally best machine is one of the three decision trees. However, when we use this method, the best machines are KNN7 and KNN9. Hence, KNN7 and KNN9 have the capacity to better capture the unknown data.
+ 
+ 
+ - Perform a basic analysis of variance (ANOVA) on those test errors and comment!
+ 
+```{r, echo=FALSE}
+library(lattice)
+library(ggplot2)
+library(caret)
+require(reshape2)
+aov.method <- aov(value~variable, data=melt(test_split, id.vars = NULL))
+anova(aov.method)
+summary(aov.method)
+
+TukeyHSD(aov.method, ordered = TRUE)
+```
+
+```{r, echo=FALSE}
+#plot version 
+plot(TukeyHSD(aov.method))
+```
+
+ 
+
+15. Comment extensively on the most general observation and lesson you gleaned from this
+exploration.
+
+The key takeaway from our analysis is that, to find the best model for our data, it is crucial to use methods like cross-validation or stochastic holdout splits. These techniques help better capture the model's ability to generalize to unseen data, providing a more realistic estimate of its performance. Without these methods, there is a higher risk of overfitting, where the model learns the noise and specific details of the training data rather than the underlying patterns. This can lead to poor performance on new, unseen data, as the model becomes too tailored to the training set.
+
+
+## Exercise 2: Nearest Neighbors Method for Digit Recognition (30points)
+
+```{r, echo=FALSE, include=FALSE}
+library(dslabs) # Package by Yann LeCun to provide the MNIST data
+mnist <- read_mnist() # Read in the MNIST data
+xtrain <- mnist$train$images
+ytrain <- mnist$train$labels
+ytrain <- as.factor(ytrain)
+ntr <- nrow(xtrain)
+p <- ncol(xtrain)
+xtest <- mnist$test$images
+ytest <- mnist$test$labels
+ytest <- as.factor(ytest)
+```
+
+## Part 1: Multi-class classification on MNIST
+
+1. Write down in mathematical form the expression of bfkNN(x), the prediction function of
+the kNN learning machine.
+
+the predicted class $\widehat{f}_{\tt kNN}(x)$ of $x \in \mathcal{X}$ is given by
+
+$$
+\widehat{f}_{\tt kNN}(x) = \underset{c \in \mathcal{Y}}{{\tt argmax}}\Bigg\{\frac{1}{k}\sum_{i=1}^n{{\bf 1}(x_i \in \mathcal{V}_k(x)){\bf 1}(y_i=c)}\Bigg\}
+$$
+
+where $\mathcal{Y}$ represents our output space and $\mathcal{X}$ represent our input space, and $\mathcal{V}_k(x)$ represents
+the set of the $k$ nearest neighbors of $x \in \mathcal{X}$ in the provided dataset $\mathcal{D}_n$.
+
+
+2. Choose n a training set size and m a test set size, and write a piece of code for sampling
+a fragment from the large dataset. Explain why you choose the numbers you chose.
+
+```{r, warning=FALSE, echo=FALSE}
+## merge train and test of our dataset for the input space
+x_full <- rbind(xtrain, xtest)
+
+# merge train and test of our dataset for in response variable
+y_full <- factor(c(as.character(ytrain), as.character(ytest)), levels = levels(ytrain))
+
+
+n <- 4000  # Training set size
+m <- 700   # Test set size
+
+set.seed(20241215) ## set for reproductivity
+train_indices <- sample(1:nrow(x_full), n)
+
+# Create training and test sets
+X_train <- x_full[train_indices, , drop = FALSE]
+y_train <- y_full[train_indices]
+X_test <- x_full[-train_indices, , drop = FALSE][1:m, , drop = FALSE]  
+y_test <- y_full[-train_indices][1:m]
+
+
+```
+
+
+
+3. Let S = 50 be the number of random splits of the data into 70% training and 30% Test.
+  
+  1. Build over all the 5 models and compute the test errors for each split, storing the
+results into a matrix of test errors
+
+```{r warning=FALSE, echo=FALSE}
+set.seed(19671210)
+S=50
+## merge train and test of our dataset for the input space
+x_full_sample <- rbind(X_train, X_test)
+
+# merge train and test of our dataset for in response variable
+y_full_sample <- factor(c(as.character(y_train), as.character(y_test)), levels = levels(y_test))
+
+stratified.holdout <- function(y, ptr)
+   {
+     n              <- length(y)
+     labels         <- unique(y)       # Obtain classifiers
+     id.tr          <- id.te <- NULL
+     # Loop once for each unique label value
+  
+     y <- sample(sample(sample(y)))
+  
+     for(j in 1:length(labels)) 
+     {
+      sj    <- which(y==labels[j])  # Grab all rows of label type j  
+      nj    <- length(sj)           # Count of label j rows to calc proportion below
+    
+      id.tr <- c(id.tr, (sample(sample(sample(sj))))[1:round(nj*ptr)])
+  }                               # Concatenates each label type together 1 by 1
+  
+  id.te  <- (1:n) [-id.tr]          # Obtain and Shuffle test indices to randomize                                
+  
+  return (list(idx1=id.tr,idx2=id.te)) 
+}
+
+
+## matrix for test error for every s for each five machine
+test.err <- matrix(0, nrow = S, ncol = 5)
+
+for (s in 1:S){
+  
+  
+   hold  <- stratified.holdout(y_full_sample, 0.7) 
+   id.tr <- hold$idx1
+   ntr   <- length(id.tr)
+   #print(ntr)
+   p   <- ncol(x_full)
+  
+   id.te <- hold$idx2
+   nte <- length(id.te)
+   #print(nte)
+  
+   xtr <- x_full_sample[id.tr,]
+   ytr <- y_full_sample[id.tr]
+   xte <- x_full_sample[id.te,]
+   yte <- y_full_sample[id.te]
+  
+  #Machine 1(knn1)
+  y.te.hat_1       <- knn(xtr, xte, ytr, k=1, prob=TRUE)
+  ind.err.te_1     <- ifelse(yte!=y.te.hat_1,1,0)  # Random variable tracking error. Indicator
+  test.err[s,1]  <- mean(ind.err.te_1)
+  
+  #Machine 2(knn5)
+  y.te.hat_5       <- knn(xtr, xte, ytr, k=5, prob=TRUE)
+  ind.err.te_5     <- ifelse(yte!=y.te.hat_5,1,0)  # Random variable tracking error. Indicator
+  test.err[s,2]  <- mean(ind.err.te_5)
+  
+  #Machine 3(knn7)
+  y.te.hat_7       <- knn(xtr, xte, ytr, k=7, prob=TRUE)
+  ind.err.te_7     <- ifelse(yte!=y.te.hat_7,1,0)  # Random variable tracking error. Indicator
+  test.err[s,3]  <- mean(ind.err.te_7)
+  
+  #Machine 3(knn9)
+  y.te.hat_9       <- knn(xtr, xte, ytr, k=9, prob=TRUE)
+  ind.err.te_9     <- ifelse(yte!=y.te.hat_9,1,0)  # Random variable tracking error. Indicator
+  test.err[s,4]  <- mean(ind.err.te_9)
+  
+  #Machine 3(knn13)
+  y.te.hat_13       <- knn(xtr, xte, ytr, k=13, prob=TRUE)
+  ind.err.te_13     <- ifelse(yte!=y.te.hat_13,1,0)  # Random variable tracking error. Indicator
+  test.err[s,5]  <- mean(ind.err.te_13)
+  
+}
+
+test <- data.frame(test.err)
+  
+Method<-c('KNN1','KNN5', 'KNN7', 'KNN9', 'KNN13')
+colnames(test) <- Method
+
+ggplot(data = melt(test, id.vars = NULL),  aes(x=, y=value)) + geom_boxplot(aes(fill=variable)) +
+    labs(x='Learning Machine', y=expression(hat(R)[te](f))) +
+    theme(legend.position="bottom") 
+```
+
+
+2. Identify the machine with the smallest median test error and generate the test confusion matrix from the last split
+
+based on the boxplot above we can see that the machine with small median test error is the KNN with k = 5.
+
+```{r, echo=FALSE}
+# confusion matrix of the last split for knn1
+conf.mat.te.knn_1 <- table(yte, y.te.hat_1)
+conf.mat.te.knn_1
+
+# confusion matrix of the last split for knn5
+conf.mat.te.knn_5 <- table(yte, y.te.hat_5)
+conf.mat.te.knn_5
+```
+
+
+3. Comment on the digits for which there is a lot more confusion. Does that agree with
+your own prior intuition about digits?
+
+Based on the confusion matrix, we observe that the digits 1 and 7 have the highest number of misclassifications. This result aligns with our intuition, as people often write the digits 1 and 7 in different ways, which can cause confusion. For example, the digit 1 may sometimes resemble a lowercase 'l' or an upright version of the digit 7, leading the model to misinterpret them. Furthermore, the machine learning model, which relies on patterns in the data, may confuse these digits with others that have similar visual features, especially in cases where there is insufficient training data or variability in handwriting styles.
+
+4. Perform an ANOVA of the test errors and comment on the patterns that emerge.
+
+```{r, echo=FALSE}
+aov.method <- aov(value~variable, data=melt(test, id.vars = NULL))
+anova(aov.method)
+summary(aov.method)
+
+TukeyHSD(aov.method, ordered = TRUE)
+
+```
+
+```{r, echo=FALSE}
+#plot version 
+plot(TukeyHSD(aov.method))
+```
+
+## Part 2: Binary classification on MNIST
+
+1. Store in memory your training set and your test set. Of course you must show the
+command that extracts only ’1’ and ’7’ from both the training and the test sets.
+
+```{r, echo=FALSE}
+
+## the propulse of this function is to extract only the digit 1 and 7
+extract_digit <- function (X_train, y_train, X_test, y_test){
+  
+  list_index_train <- c()
+  list_index_test <- c()
+  
+  n_tr <- nrow(X_train)
+  n_te <- nrow(X_test)
+  for (i in 1:n_tr){
+    if (y_train[i] == 1  |  y_train[i] == 7){
+        list_index_train <- c(list_index_train, c(i))
+    }
+  }
+  
+  for (i in 1:n_te){
+    if (y_test[i] == 1  |  y_test[i] == 7){
+        list_index_test <- c(list_index_test, c(i))
+    }
+  }
+  
+  return  (list(X_train=X_train[list_index_train, ], y_train=factor(y_train[list_index_train], levels= c(1, 7)), X_test = X_test[list_index_test, ], y_test=factor(y_test[list_index_test], levels=c(1,7) ))) 
+}
+list = extract_digit(X_train, y_train, X_test, y_test)
+
+X_train_custom = list$X_train
+y_train_custom = list$y_train
+
+X_test_custom = list$X_test
+y_test_custom = list$y_test
+```
+
+2. Display both your training confusion matrix and your test confusion matrix
+
+```{r, echo=FALSE}
+  
+
+  #Machine 1(knn1)
+  y.te_7.hat_1       <- knn(X_train_custom, X_test_custom, y_train_custom, k=1, prob=TRUE)
+  ind.err.te_1     <- ifelse(y_test_custom!=y.te_7.hat_1,1,0)  # Random variable tracking error. Indicator
+  table(y_test_custom, y.te_7.hat_1)
+  
+  prob_1    <- attr(y.te_7.hat_1, 'prob')
+  prob_1    <- 2*ifelse(y.te_7.hat_1 == "1", 1-prob_1, prob_1) - 1
+  pred.knn_1 <- prediction(prob_1, y_test_custom)
+  pred.knn_1 <- performance(pred.knn_1, measure='tpr', x.measure='fpr')
+  
+  #Machine 2(knn5)
+  y.te_7.hat_5       <- knn(X_train_custom, X_test_custom, y_train_custom, k=5, prob=TRUE)
+  ind.err.te_5     <- ifelse(y_test_custom!=y.te_7.hat_5,1,0)  # Random variable tracking error. Indicator
+  table(y_test_custom, y.te_7.hat_5)
+  
+  prob_5    <- attr(y.te_7.hat_5, 'prob')
+  prob_5    <- 2*ifelse(y.te_7.hat_5 == "1", 1-prob_5, prob_5) - 1
+  pred.knn_5 <- prediction(prob_5, y_test_custom)
+  pred.knn_5 <- performance(pred.knn_5, measure='tpr', x.measure='fpr')
+  
+  #Machine 3(knn7)
+  y.te_7.hat_7       <- knn(X_train_custom, X_test_custom, y_train_custom, k=7, prob=TRUE)
+  ind.err.te_7     <- ifelse(y_test_custom!=y.te_7.hat_7,1,0)  # Random variable tracking error. Indicator
+  table(y_test_custom, y.te_7.hat_7)
+  
+  
+  prob_7    <- attr(y.te_7.hat_7, 'prob')
+  prob_7    <- 2*ifelse(y.te_7.hat_7 == "1", 1-prob_7, prob_7) - 1
+  pred.knn_7 <- prediction(prob_7, y_test_custom)
+  pred.knn_7 <- performance(pred.knn_7, measure='tpr', x.measure='fpr')
+  
+  #Machine 3(knn9)
+  y.te_7.hat_9       <- knn(X_train_custom, X_test_custom, y_train_custom, k=9, prob=TRUE)
+  ind.err.te_9     <- ifelse(y_test_custom!=y.te_7.hat_9,1,0)  # Random variable tracking error. Indicator
+  table(y_test_custom, y.te_7.hat_9)
+  
+  prob_9   <- attr(y.te_7.hat_9, 'prob')
+  prob_9    <- 2*ifelse(y.te_7.hat_9 == "1", 1-prob_9, prob_9) - 1
+  pred.knn_9 <- prediction(prob_9, y_test_custom)
+  pred.knn_9 <- performance(pred.knn_9, measure='tpr', x.measure='fpr')
+  
+  #Machine 3(knn13)
+  y.te_7.hat_13       <- knn(X_train_custom, X_test_custom, y_train_custom, k=13, prob=TRUE)
+  ind.err.te_13     <- ifelse(y_test_custom!=y.te_7.hat_13,1,0)  # Random variable tracking error. Indicator
+  table(y_test_custom, y.te_7.hat_13)
+  
+  prob_13   <- attr(y.te_7.hat_13, 'prob')
+  prob_13    <- 2*ifelse(y.te_7.hat_13 == "1", 1-prob_13, prob_13) - 1
+  
+  pred.knn_13 <- prediction(prob_13, y_test_custom)
+  pred.knn_13 <- performance(pred.knn_13, measure='tpr', x.measure='fpr')
+
+```
+3. Display the comparative ROC curves of the five learning machines
+
+```{r, echo=FALSE}
+  plot(pred.knn_1, col=2, lwd= 2, lty=2, main="ROC Comparaison between Five machines")
+  plot(pred.knn_5, col=3, lwd= 2, lty=3, add = TRUE)
+  plot(pred.knn_7, col=4, lwd= 2, lty=4, add = TRUE)
+  plot(pred.knn_9, col=5, lwd= 2, lty=5, add = TRUE)
+  plot(pred.knn_13, col=6, lwd= 2, lty=6, add = TRUE)
+  abline(a=0,b=1) ## Random Classifiers
+  legend("bottomright", inset = 0.05, legend = c("KNN1", "KNN5", "KNN7", "KNN9", "KNN13"), col = 2:7, lty = 2:4, lwd = 2)
+```
+4. Identify two false positives and two false negatives at the test phase, and in each case,
+plot the true image against its falsely predicted counterpart.
+
+```{r, echo=FALSE}
+
+# Function to identify two false positives and two false negatives
+find_false_positives_negatives <- function(true_labels, predicted_labels) {
+  
+  false_positives <- which(true_labels == 1 & predicted_labels == 7)
+
+  
+  false_negatives <- which(true_labels == 7 & predicted_labels == 1)
+  
+  fp_indices <- false_positives[1:2]
+  fn_indices <- false_negatives[1:2]
+  
+  return(list(false_positives = fp_indices, false_negatives = fn_indices))
+}
+
+
+result_1 <- find_false_positives_negatives(y_test_custom, y.te_7.hat_1)
+print("Index postion of false positives and two false negatives for KNN1")
+print(result_1)
+
+result_5 <- find_false_positives_negatives(y_test_custom, y.te_7.hat_5)
+print("Index postion of false positives and two false negatives for KNN5")
+print(result_5)
+
+result_7 <- find_false_positives_negatives(y_test_custom, y.te_7.hat_7)
+print("Index postion of false positives and two false negatives for KNN7")
+print(result_5)
+
+result_9 <- find_false_positives_negatives(y_test_custom, y.te_7.hat_9)
+print("Index postion of false positives and two false negatives for KNN9")
+print(result_9)
+
+result_13 <- find_false_positives_negatives(y_test_custom, y.te_7.hat_13)
+print("Index postion of false positives and two false negatives for KNN13")
+print(result_13)
+
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+par(mfrow = c(2, 2))  
+
+
+for (i in 1:2) {
+  
+  image(matrix(X_train_custom[result_1$false_positives[i], ], nrow = 28, ncol = 28, byrow = TRUE), 
+        axes = FALSE, col = gray.colors(256))
+  title(main = paste("KNN1 - FP", i))
+}
+
+for (i in 1:2) {
+  image(matrix(X_train_custom[result_1$false_negatives[i], ], nrow = 28, ncol = 28, byrow = TRUE), 
+        axes = FALSE, col = gray.colors(256))
+  title(main = paste("KNN1 - FN", i))
+}
+
+
+for (i in 1:2) {
+  
+  image(matrix(X_train_custom[result_5$false_positives[i], ], nrow = 28, ncol = 28, byrow = TRUE), 
+        axes = FALSE, col = gray.colors(256))
+  title(main = paste("KNN5 - FP", i))
+}
+
+for (i in 1:2) {
+  
+  image(matrix(X_train_custom[result_5$false_negatives[i], ], nrow = 28, ncol = 28, byrow = TRUE), 
+        axes = FALSE, col = gray.colors(256))
+  title(main = paste("KNN5 - FN", i))
+}
+
+
+for (i in 1:2) {
+  
+  image(matrix(X_train_custom[result_7$false_positives[i], ], nrow = 28, ncol = 28, byrow = TRUE), 
+        axes = FALSE, col = gray.colors(256))
+  title(main = paste("KNN7 - FP", i))
+}
+
+for (i in 1:2) {
+  
+  image(matrix(X_train_custom[result_7$false_negatives[i], ], nrow = 28, ncol = 28, byrow = TRUE), 
+        axes = FALSE, col = gray.colors(256))
+  title(main = paste("KNN7 - FN", i))
+}
+
+
+for (i in 1:2) {
+  
+  image(matrix(X_train_custom[result_9$false_positives[i], ], nrow = 28, ncol = 28, byrow = TRUE), 
+        axes = FALSE, col = gray.colors(256))
+  title(main = paste("KNN9 - FP", i))
+}
+
+for (i in 1:2) {
+  
+  image(matrix(X_train_custom[result_9$false_negatives[i], ], nrow = 28, ncol = 28, byrow = TRUE), 
+        axes = FALSE, col = gray.colors(256))
+  title(main = paste("KNN9 - FN", i))
+}
+
+
+for (i in 1:2) {
+  
+  image(matrix(X_train_custom[result_13$false_positives[i], ], nrow = 28, ncol = 28, byrow = TRUE), 
+        axes = FALSE, col = gray.colors(256))
+  title(main = paste("KNN13 - FP", i))
+}
+
+for (i in 1:2) {
+  
+  image(matrix(X_train_custom[result_13$false_negatives[i], ], nrow = 28, ncol = 28, byrow = TRUE), 
+        axes = FALSE, col = gray.colors(256))
+  title(main = paste("KNN13 - FN", i))
+}
+```
+5. Comment on any pattern that might have emerged.
+
+Based on the results above, we observe that the model is making a significant number of mistakes when predicting the digits 1 and 7. This issue arises because the digits 1 and 7 are visually similar, which makes them difficult to distinguish. Additionally, due to the small sample size in our dataset, the model may not have had enough examples to properly learn the distinction between these two digits. As a result, the model struggles to accurately recognize the digit 1 from the digit 7.
+
+
+## Exercise 3: Video component (10 points)
+
+https://youtu.be/vyNZCRGpj6U
+
